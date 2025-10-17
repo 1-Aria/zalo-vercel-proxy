@@ -1,23 +1,25 @@
 export default async function handler(req, res) {
-  if (req.method === "POST") {
-    // Respond to Zalo immediately
-    res.status(200).send("OK");
-
-    // Then handle the forward in the background
+  if (req.method === 'POST') {
     try {
-      await fetch("https://script.google.com/macros/s/AKfycbxTUqUYhz9sNpp1SFTdwS4eK4z6_Rb_I49lU17vPdPiNJM1d9AHKvHYO4y8NgHntN97zA/exec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(req.body)
+      // Replace this with your Apps Script Web App URL
+      const scriptUrl = "https://script.google.com/macros/s/AKfycbxTUqUYhz9sNpp1SFTdwS4eK4z6_Rb_I49lU17vPdPiNJM1d9AHKvHYO4y8NgHntN97zA/exec";
+
+      // Forward the payload to your Apps Script
+      const response = await fetch(scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body),
       });
-      console.log("Forwarded event to Google Sheets");
+
+      const text = await response.text();
+
+      // Return OK to Zalo immediately
+      res.status(200).send("OK");
     } catch (err) {
-      console.error("Forward error:", err);
+      console.error("Forwarding error:", err);
+      res.status(500).send("Error forwarding to Apps Script");
     }
-
-    return; // stop here
+  } else {
+    res.status(405).send("Method not allowed");
   }
-
-  // For GET or other methods
-  res.status(200).send("Webhook active");
 }
