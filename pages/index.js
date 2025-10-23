@@ -1,8 +1,8 @@
 export default function Home() {
   return (
-    <div style={{ padding: 40, fontFamily: "sans-serif" }}>
-      <h1>✅ Zalo Dashboard Test</h1>
-      <p>If you can see this, your deployment works.</p>
-    </div>
+    <main style={{ padding: 40 }}>
+      <h1>✅ Dashboard Online</h1>
+      <p>If you see this, Next.js routing is fixed.</p>
+    </main>
   );
 }
