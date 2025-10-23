@@ -49,9 +49,8 @@ export default function Home() {
               onChange={(e) => handleFilter(e.target.value)}
             >
               <option value="all">All</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+  <option value="pending">Pending</option>
+  <option value="closed">Closed</option>
             </select>
           </div>
         </div>
