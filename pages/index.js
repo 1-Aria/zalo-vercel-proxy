@@ -148,7 +148,7 @@ export default function App() {
             border-spacing: 0;
           }
           .table-head {
-            background-color: #3b82f6; /* Blue header */
+            background-color: #1e3a8a; /* Blue header */
             color: white;
           }
           .table-head th {
@@ -250,9 +250,9 @@ export default function App() {
             .table-body tr {
                 display: block; /* Make row act like a block (card) */
                 margin-bottom: 1rem;
-                border: 1px solid #e0e7ff;
+                border: 1px solid #d1d5db; /* Better border for card separation */
                 border-radius: 8px;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Lighter shadow */
                 background-color: white !important; /* Ensure consistent background */
                 padding: 1rem;
                 animation: fadeIn 0.3s ease-out;
@@ -264,18 +264,26 @@ export default function App() {
             .table-body td {
                 display: flex; /* Make cell content flex for label/value alignment */
                 justify-content: space-between;
-                align-items: center;
-                border: none; /* Remove horizontal border lines */
+                align-items: flex-start; /* FIX: Align to top for multi-line content */
+                border-bottom: 1px solid #f3f4f6; /* FIX: Add internal separator for columns/fields */
                 padding: 0.6rem 0;
                 font-size: 1rem; /* Slightly larger text for readability */
                 position: relative;
+                word-break: break-word; /* FIX: Ensure long text wraps */
+                white-space: normal; /* FIX: Ensure normal wrapping behavior */
             }
+            /* FIX: Remove separator from the last field in the card */
+            .table-body td:last-of-type {
+                border-bottom: none;
+            }
+            
             .table-body td::before {
                 /* Use the data-label attribute to display the column name */
                 content: attr(data-label);
                 font-weight: 600;
                 color: #1e3a8a; /* Header blue color */
                 min-width: 45%;
+                flex-shrink: 0; /* Prevent label from shrinking */
                 text-align: left;
                 padding-right: 1rem;
             }
