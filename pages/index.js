@@ -50,11 +50,11 @@ export default function App() {
     const valueString = String(val);
     if (key.toLowerCase() === "status") {
       const status = valueString.toLowerCase();
-      let className = "status-default";
+      let className = "status-badge status-default"; // Added status-badge base class
       if (status === "pending") {
-        className = "status-pending";
+        className = "status-badge status-pending";
       } else if (status === "closed") {
-        className = "status-closed";
+        className = "status-badge status-closed";
       }
       return <span className={className}>{valueString}</span>;
     }
@@ -209,7 +209,9 @@ export default function App() {
             color: #6b7280;
           }
           
-          /* Responsive adjustments */
+          /* ===================================== */
+          /* MOBILE (CARD VIEW) TRANSFORMATION CSS */
+          /* ===================================== */
           @media (max-width: 640px) {
             .main-card {
                 padding: 1rem;
@@ -221,13 +223,70 @@ export default function App() {
             }
             .filter-bar {
                 flex-direction: column;
-                align-items: flex-start;
+                align-items: stretch;
             }
             .filter-info {
                 margin-bottom: 0.5rem;
             }
-            .table-head th, .table-body td {
-                padding: 8px 12px;
+            .filter-controls {
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            /* Card View Styles */
+            .table-wrapper {
+                overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+                border: none;
+                box-shadow: none;
+            }
+            .data-table {
+                /* Add space between rows (cards) */
+                border-spacing: 0 10px;
+                border-collapse: separate;
+            }
+            .table-head {
+                display: none; /* Hide the table header */
+            }
+            .table-body tr {
+                display: block; /* Make row act like a block (card) */
+                margin-bottom: 1rem;
+                border: 1px solid #e0e7ff;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+                background-color: white !important; /* Ensure consistent background */
+                padding: 1rem;
+                animation: fadeIn 0.3s ease-out;
+            }
+            .table-body tr:nth-child(even), .table-body tr:hover {
+                /* Override striped and hover background on mobile */
+                background-color: white !important;
+            }
+            .table-body td {
+                display: flex; /* Make cell content flex for label/value alignment */
+                justify-content: space-between;
+                align-items: center;
+                border: none; /* Remove horizontal border lines */
+                padding: 0.6rem 0;
+                font-size: 1rem; /* Slightly larger text for readability */
+                position: relative;
+            }
+            .table-body td::before {
+                /* Use the data-label attribute to display the column name */
+                content: attr(data-label);
+                font-weight: 600;
+                color: #1e3a8a; /* Header blue color */
+                min-width: 45%;
+                text-align: left;
+                padding-right: 1rem;
+            }
+            .status-badge {
+                /* Ensure badges look good in the flex layout */
+                margin-left: auto;
+            }
+            
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
             }
           }
         `}
@@ -279,7 +338,8 @@ export default function App() {
                 {filtered.map((row, i) => (
                   <tr key={i}>
                     {getHeaders().map((key, j) => (
-                      <td key={j}>
+                      // === MODIFICATION: Added data-label attribute for mobile view ===
+                      <td key={j} data-label={key}>
                         {renderCellContent(key, row[key])}
                       </td>
                     ))}
