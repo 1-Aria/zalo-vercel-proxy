@@ -148,7 +148,8 @@ export default function App() {
             border-spacing: 0;
           }
           .table-head {
-            background-color: #1e3a8a; /* Blue header */
+            /* General header background (for older browsers/fallbacks) */
+            background-color: #1e3a8a; 
             color: white;
           }
           .table-head th {
@@ -156,7 +157,10 @@ export default function App() {
             text-align: left;
             font-size: 0.875rem;
             font-weight: 600;
-            border-bottom: 2px solid #2563eb;
+            /* CRITICAL FIX: Use !important to override specificity issues */
+            background-color: #1e3a8a !important; 
+            border-bottom: 2px solid #1e3a8a; 
+            color: white !important; /* Ensure text remains white */
             white-space: nowrap;
           }
           .table-body tr {
@@ -302,7 +306,7 @@ export default function App() {
 
       <div className="main-card">
         <h1 className="header-title">
-          📊 Data Request Dashboard
+          BÁO CÁO SỰ CỐ
         </h1>
 
         {/* Filter bar */}
