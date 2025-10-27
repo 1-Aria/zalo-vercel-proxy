@@ -337,16 +337,16 @@ export default function App() {
 
       <div className="main-card">
         <h1 className="header-title">
-          📊 Data Request Dashboard
+          HỆ THỐNG BẢO TRÌ
         </h1>
 
         {/* Filter bar */}
         <div className="filter-bar">
           <p className="filter-info">
-            Showing **{filtered.length}** of **{data.length}** total entries
+            Thể hiện <span className="count-highlight">{filtered.length}</span> trong <span className="count-highlight">{data.length}</span> các sự cố
           </p>
           <div className="filter-controls">
-            <label className="select-label">Filter by Status:</label>
+            <label className="select-label">Lọc theo Status:</label>
             <select
               className="status-select"
               value={statusFilter}
