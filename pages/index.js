@@ -5,6 +5,23 @@ const MAX_LENGTH = 36;
 const CACHE_KEY = "requestDashboardData";
 const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
+/**
+ * Helper function to assign a numerical rank for custom status sorting.
+ * Lower numbers mean higher priority (appear first).
+ */
+const getSortOrder = (status) => {
+  const lowerStatus = String(status || "").toLowerCase();
+  
+  if (lowerStatus === "new") {
+    return 1; // Highest Priority
+  } else if (lowerStatus === "pending") {
+    return 2; // Second Priority
+  } else if (lowerStatus === "closed") {
+    return 3; // Third Priority
+  }
+  return 99; // All other statuses go to the bottom
+};
+
 export default function App() {
   const [data, setData] = useState([]);
   const [filtered, setFiltered] = useState([]);
@@ -23,8 +40,27 @@ export default function App() {
     const cleanData = rawData.filter(row =>
       Object.values(row).some(val => val !== null && val !== undefined && String(val).trim() !== "")
     );
-    setData(cleanData);
-    setFiltered(cleanData);
+    
+    // --- CUSTOM SORTING IMPLEMENTED HERE ---
+    const sortedData = cleanData.sort((a, b) => {
+      const orderA = getSortOrder(a.Status);
+      const orderB = getSortOrder(b.Status);
+      
+      // 1. Sort primarily by the custom status order (1, 2, 3, 99)
+      if (orderA !== orderB) {
+          return orderA - orderB;
+      }
+      
+      // 2. Secondary sort: If statuses are the same, use the first column (e.g., ID or Timestamp) 
+      //    to maintain stable ordering.
+      const keyA = String(Object.values(a)[0] || '');
+      const keyB = String(Object.values(b)[0] || '');
+      return keyA.localeCompare(keyB); 
+    });
+    // --- END SORTING ---
+
+    setData(sortedData);
+    setFiltered(sortedData); // Filtered view starts as the sorted full list
     setLoading(false);
   };
 
@@ -205,6 +241,15 @@ export default function App() {
             display: flex;
             justify-content: space-between;
             align-items: center;
+          }
+          .filter-info {
+            color: #6b7280;
+            font-size: 0.875rem;
+          }
+          /* Styling for the colored number counts */
+          .count-highlight {
+            color: #1e3a8a; /* Deep blue color */
+            font-weight: 700; /* Bold the number for emphasis */
           }
           .status-select {
             border: 1px solid #d1d5db;
