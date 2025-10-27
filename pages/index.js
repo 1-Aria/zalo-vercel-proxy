@@ -1,22 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
 // --- Caching and Truncation Configuration ---
 const MAX_LENGTH = 36;
-const CACHE_KEY = "requestDashboardData";
+const CACHE_KEY = 'requestDashboardData';
 const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Helper function to assign a numerical rank for custom status sorting.
  * Lower numbers mean higher priority (appear first).
  */
-const getSortOrder = (status) => {
-  const lowerStatus = String(status || "").toLowerCase();
-  
-  if (lowerStatus === "new") {
+const getSortOrder = status => {
+  const lowerStatus = String(status || '').toLowerCase();
+
+  if (lowerStatus === 'new') {
     return 1; // Highest Priority
-  } else if (lowerStatus === "pending") {
+  } else if (lowerStatus === 'pending') {
     return 2; // Second Priority
-  } else if (lowerStatus === "closed") {
+  } else if (lowerStatus === 'closed') {
     return 3; // Third Priority
   }
   return 99; // All other statuses go to the bottom
@@ -26,36 +26,38 @@ export default function App() {
   const [data, setData] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState('all');
   // State to track which truncated cells are expanded
   const [expandedCells, setExpandedCells] = useState({});
 
   // Endpoint to fetch data
   const endpoint =
-    "https://script.google.com/macros/s/AKfycbxTUqUYhz9sNpp1SFTdwS4eK4z6_Rb_I49lU17vPdPiNJM1d9AHKvHYO4y8NgHntN97zA/exec";
+    'https://script.google.com/macros/s/AKfycbxTUqUYhz9sNpp1SFTdwS4eK4z6_Rb_I49lU17vPdPiNJM1d9AHKvHYO4y8NgHntN97zA/exec';
 
   // Function to process and set data
-  const processData = (rawData) => {
+  const processData = rawData => {
     // Filter out completely empty rows for clean data presentation
     const cleanData = rawData.filter(row =>
-      Object.values(row).some(val => val !== null && val !== undefined && String(val).trim() !== "")
+      Object.values(row).some(
+        val => val !== null && val !== undefined && String(val).trim() !== ''
+      )
     );
-    
+
     // --- CUSTOM SORTING IMPLEMENTED HERE ---
     const sortedData = cleanData.sort((a, b) => {
       const orderA = getSortOrder(a.Status);
       const orderB = getSortOrder(b.Status);
-      
+
       // 1. Sort primarily by the custom status order (1, 2, 3, 99)
       if (orderA !== orderB) {
-          return orderA - orderB;
+        return orderA - orderB;
       }
-      
-      // 2. Secondary sort: If statuses are the same, use the first column (e.g., ID or Timestamp) 
+
+      // 2. Secondary sort: If statuses are the same, use the first column (e.g., ID or Timestamp)
       //    to maintain stable ordering.
       const keyA = String(Object.values(a)[0] || '');
       const keyB = String(Object.values(b)[0] || '');
-      return keyA.localeCompare(keyB); 
+      return keyA.localeCompare(keyB);
     });
     // --- END SORTING ---
 
@@ -66,69 +68,74 @@ export default function App() {
 
   useEffect(() => {
     let initialLoadComplete = false;
-    
+
     // 1. Check for Cache (Instant Load)
     try {
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
         const { timestamp, data: cachedData } = JSON.parse(cached);
         const now = Date.now();
-        
+
         // Check if cache is still valid
         if (now - timestamp < CACHE_EXPIRY_MS) {
-          console.log("Loading data from fresh cache.");
+          console.log('Loading data from fresh cache.');
           processData(cachedData);
           initialLoadComplete = true;
         } else {
-          console.log("Cache expired, using stale data for instant display.");
+          console.log('Cache expired, using stale data for instant display.');
           processData(cachedData); // Use stale data for instant display (SWR)
         }
       }
     } catch (e) {
-      console.error("Error reading cache:", e);
+      console.error('Error reading cache:', e);
     } finally {
-        if (!initialLoadComplete) setLoading(true);
+      if (!initialLoadComplete) setLoading(true);
     }
-    
+
     // 2. Fetch Fresh Data (Revalidation)
     fetch(endpoint)
-      .then((res) => res.json())
-      .then((freshData) => {
+      .then(res => res.json())
+      .then(freshData => {
         // Only update if fresh data is different or if we loaded stale/no data
-        if (!initialLoadComplete || JSON.stringify(data) !== JSON.stringify(freshData)) {
-            console.log("Fetched fresh data from network.");
-            processData(freshData);
-            
-            // Update cache
-            const cacheItem = {
-              timestamp: Date.now(),
-              data: freshData,
-            };
-            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheItem));
+        if (
+          !initialLoadComplete ||
+          JSON.stringify(data) !== JSON.stringify(freshData)
+        ) {
+          console.log('Fetched fresh data from network.');
+          processData(freshData);
+
+          // Update cache
+          const cacheItem = {
+            timestamp: Date.now(),
+            data: freshData,
+          };
+          localStorage.setItem(CACHE_KEY, JSON.stringify(cacheItem));
         } else {
-            // Data was the same as cache/already loaded
-            setLoading(false);
+          // Data was the same as cache/already loaded
+          setLoading(false);
         }
       })
       .catch(error => {
-        console.error("Failed to fetch fresh data:", error);
+        console.error('Failed to fetch fresh data:', error);
         if (!initialLoadComplete) {
-            setData([]);
-            setFiltered([]);
-            setLoading(false);
+          setData([]);
+          setFiltered([]);
+          setLoading(false);
         }
       });
   }, []); // Run only on component mount
 
-  const handleFilter = (status) => {
+  const handleFilter = status => {
     setStatusFilter(status);
     const lower = status.toLowerCase();
 
-    if (lower === "all") {
+    if (lower === 'all') {
       setFiltered(data);
     } else {
       // Filter rows based on the 'Status' key
-      setFiltered(data.filter((row) => String(row.Status || "").toLowerCase() === lower));
+      setFiltered(
+        data.filter(row => String(row.Status || '').toLowerCase() === lower)
+      );
     }
   };
 
@@ -141,54 +148,55 @@ export default function App() {
     }
     return [];
   };
-  
+
   // Renders the cell content, handling status badges, highlighting, and truncation
   const renderContent = (key, val, i, j) => {
     const valueString = String(val);
     const cellKey = `${i}-${j}`;
     const isExpanded = expandedCells[cellKey];
     const isLong = valueString.length > MAX_LENGTH;
-    const isImportantField = key === "Chờ Xác Nhận" || key === "Chờ Đóng";
+    const isImportantField = key === 'Chờ Xác Nhận' || key === 'Chờ Đóng';
 
     const toggleExpand = () => {
       setExpandedCells(prev => ({
         ...prev,
-        [cellKey]: !prev[cellKey]
+        [cellKey]: !prev[cellKey],
       }));
     };
 
     let content;
 
     // 1. Status Badge Check
-    if (key.toLowerCase() === "status") {
+    if (key.toLowerCase() === 'status') {
       const status = valueString.toLowerCase();
-      let badgeClass = "status-badge status-default";
-      if (status === "pending") {
-        badgeClass = "status-badge status-pending";
-      } else if (status === "closed") {
-        badgeClass = "status-badge status-closed";
-      } else if (status === "new") {
-        badgeClass = "status-badge status-new"; // New Red Status
+      let badgeClass = 'status-badge status-default';
+      if (status === 'pending') {
+        badgeClass = 'status-badge status-pending';
+      } else if (status === 'closed') {
+        badgeClass = 'status-badge status-closed';
+      } else if (status === 'new') {
+        badgeClass = 'status-badge status-new'; // New Red Status
       }
       content = <span className={badgeClass}>{valueString}</span>;
     } else {
       // 2. Truncation Logic
-      const displayValue = isExpanded || !isLong
-        ? valueString
-        : valueString.substring(0, MAX_LENGTH);
-      
-      content = <div className="content-text">{displayValue}</div>;
+      const displayValue =
+        isExpanded || !isLong
+          ? valueString
+          : valueString.substring(0, MAX_LENGTH);
+
+      content = <div className='content-text'>{displayValue}</div>;
     }
 
     // Apply highlighting class if the field is important
-    const cellClass = isImportantField ? "important-field" : "";
+    const cellClass = isImportantField ? 'important-field' : '';
 
     return (
       <div className={cellClass}>
         {content}
         {/* Truncation button logic */}
         {isLong && (
-          <button onClick={toggleExpand} className="expand-button">
+          <button onClick={toggleExpand} className='expand-button'>
             {isExpanded ? 'View less' : '...'}
           </button>
         )}
@@ -197,7 +205,7 @@ export default function App() {
   };
 
   return (
-    <div className="dashboard-container">
+    <div className='dashboard-container'>
       <style>
         {`
           /* ===================================== */
@@ -228,7 +236,45 @@ export default function App() {
             border-bottom: 2px solid #e0e7ff;
             padding-bottom: 0.5rem;
           }
-          
+          /* --- INSTRUCTION BOARD STYLES --- */
+          .instruction-box {
+            border: 2px solid #a5b4fc; /* Light blue border */
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem; /* Space before the table/entries */
+            background-color: #f0f4ff; /* Very light blue background */
+          }
+          .instruction-title {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: #1e3a8a;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px dashed #c7d2fe;
+            padding-bottom: 0.5rem;
+          }
+          .instruction-item {
+            margin-bottom: 0.75rem;
+            line-height: 1.5;
+            font-size: 0.95rem;
+          }
+          .highlight-code {
+            font-weight: 700;
+            color: #d97706; /* Dark orange/amber for the command structure */
+            background-color: #fffbeb;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: monospace; /* Monospace for code/commands */
+          }
+          .example-code {
+            display: block;
+            font-style: italic;
+            font-size: 0.85rem;
+            color: #4b5563; /* Gray for the example */
+            margin-left: 1rem;
+            margin-top: 0.25rem;
+            font-family: monospace;
+          }
+          /* --- END INSTRUCTION BOARD STYLES --- */         
           /* Filter Bar */
           .filter-bar {
             display: flex;
@@ -380,50 +426,79 @@ export default function App() {
         `}
       </style>
 
-      <div className="main-card">
-        <h1 className="header-title">
-          HỆ THỐNG BẢO TRÌ
-        </h1>
+      <div className='main-card'>
+        <h1 className='header-title'>HỆ THỐNG BẢO TRÌ</h1>
+
+        {/* --- INSTRUCTION BOARD --- */}
+        <div className='instruction-box'>
+          <h2 className='instruction-title'>Hướng dẫn sử dụng:</h2>
+          <div className='instruction-item'>
+            Nhắn{' '}
+            <span className='highlight-code'>
+              #req [ID máy] [lý do yêu cầu]
+            </span>{' '}
+            để yêu cầu báo cáo sự cố
+            <br />
+            <span className='example-code'>VD: #req 125 máy ngừng chạy</span>
+          </div>
+          <div className='instruction-item'>
+            Nhắn <span className='highlight-code'>#accept [ID sự cố]</span> để
+            yêu cầu phân công xử lý sự cố (Dành cho nhân viên bảo trì)
+            <br />
+            <span className='example-code'>VD: #accept 20251018-1449-449</span>
+          </div>
+          <div className='instruction-item'>
+            Nhắn <span className='highlight-code'>#close [ID sự cố]</span> để
+            yêu cầu đóng sự cố khi đã thoả mãn
+            <br />
+            <span className='example-code'>VD: #close 20251018-1449-449</span>
+          </div>
+        </div>
+        {/* --- END INSTRUCTION BOARD --- */}
+
+        {/* Table/Card View */}
 
         {/* Filter bar */}
-        <div className="filter-bar">
-          <p className="filter-info">
-            Thể hiện <span className="count-highlight">{filtered.length}</span> trong <span className="count-highlight">{data.length}</span> các sự cố
+        <div className='filter-bar'>
+          <p className='filter-info'>
+            Thể hiện <span className='count-highlight'>{filtered.length}</span>{' '}
+            trong <span className='count-highlight'>{data.length}</span> các sự
+            cố
           </p>
-          <div className="filter-controls">
-            <label className="select-label">Lọc theo Status:</label>
+          <div className='filter-controls'>
+            <label className='select-label'>Lọc theo Status:</label>
             <select
-              className="status-select"
+              className='status-select'
               value={statusFilter}
-              onChange={(e) => handleFilter(e.target.value)}
+              onChange={e => handleFilter(e.target.value)}
             >
-              <option value="all">All</option>
-              <option value="new">New</option>
-              <option value="pending">Pending</option>
-              <option value="closed">Closed</option>
-              <option value="other">Other</option>
+              <option value='all'>All</option>
+              <option value='new'>New</option>
+              <option value='pending'>Pending</option>
+              <option value='closed'>Closed</option>
+              <option value='other'>Other</option>
             </select>
           </div>
         </div>
 
         {/* Table/Card View */}
         {loading ? (
-          <div className="loading-message">Loading data...</div>
+          <div className='loading-message'>Loading data...</div>
         ) : filtered.length === 0 ? (
-          <div className="empty-message">
+          <div className='empty-message'>
             No data available for the current filter.
           </div>
         ) : (
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead className="table-head">
+          <div className='table-wrapper'>
+            <table className='data-table'>
+              <thead className='table-head'>
                 <tr>
-                  {getHeaders().map((key) => (
+                  {getHeaders().map(key => (
                     <th key={key}>{key}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="table-body">
+              <tbody className='table-body'>
                 {filtered.map((row, i) => (
                   <tr key={i}>
                     {getHeaders().map((key, j) => (
