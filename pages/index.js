@@ -1,209 +1,329 @@
 import { useEffect, useState } from "react";
 
-// The main application component, renamed from Home to App
+// --- Caching and Truncation Configuration ---
+const MAX_LENGTH = 36;
+const CACHE_KEY = "requestDashboardData";
+const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
 export default function App() {
   const [data, setData] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  // State to track which truncated cells are expanded
+  const [expandedCells, setExpandedCells] = useState({});
 
   // Endpoint to fetch data
   const endpoint =
     "https://script.google.com/macros/s/AKfycbxTUqUYhz9sNpp1SFTdwS4eK4z6_Rb_I49lU17vPdPiNJM1d9AHKvHYO4y8NgHntN97zA/exec";
 
+  // Function to process and set data
+  const processData = (rawData) => {
+    // Filter out completely empty rows for clean data presentation
+    const cleanData = rawData.filter(row =>
+      Object.values(row).some(val => val !== null && val !== undefined && String(val).trim() !== "")
+    );
+    setData(cleanData);
+    setFiltered(cleanData);
+    setLoading(false);
+  };
+
   useEffect(() => {
+    let initialLoadComplete = false;
+    
+    // 1. Check for Cache (Instant Load)
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { timestamp, data: cachedData } = JSON.parse(cached);
+        const now = Date.now();
+        
+        // Check if cache is still valid
+        if (now - timestamp < CACHE_EXPIRY_MS) {
+          console.log("Loading data from fresh cache.");
+          processData(cachedData);
+          initialLoadComplete = true;
+        } else {
+          console.log("Cache expired, using stale data for instant display.");
+          processData(cachedData); // Use stale data for instant display (SWR)
+        }
+      }
+    } catch (e) {
+      console.error("Error reading cache:", e);
+    } finally {
+        if (!initialLoadComplete) setLoading(true);
+    }
+    
+    // 2. Fetch Fresh Data (Revalidation)
     fetch(endpoint)
       .then((res) => res.json())
-      .then((data) => {
-        // --- FIX FOR EMPTY ROWS ---
-        // Filter out any rows that are completely empty (all values are null, undefined, or empty strings)
-        const cleanData = data.filter(row =>
-          Object.values(row).some(val => val !== null && val !== undefined && String(val).trim() !== "")
-        );
-        // --- END FIX ---
-
-        setData(cleanData);
-        setFiltered(cleanData);
+      .then((freshData) => {
+        // Only update if fresh data is different or if we loaded stale/no data
+        if (!initialLoadComplete || JSON.stringify(data) !== JSON.stringify(freshData)) {
+            console.log("Fetched fresh data from network.");
+            processData(freshData);
+            
+            // Update cache
+            const cacheItem = {
+              timestamp: Date.now(),
+              data: freshData,
+            };
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheItem));
+        } else {
+            // Data was the same as cache/already loaded
+            setLoading(false);
+        }
       })
       .catch(error => {
-        console.error("Failed to fetch data:", error);
-        // Set data to empty array on failure
-        setData([]);
-        setFiltered([]);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+        console.error("Failed to fetch fresh data:", error);
+        if (!initialLoadComplete) {
+            setData([]);
+            setFiltered([]);
+            setLoading(false);
+        }
+      });
+  }, []); // Run only on component mount
 
   const handleFilter = (status) => {
     setStatusFilter(status);
-    if (status === "all") {
+    const lower = status.toLowerCase();
+
+    if (lower === "all") {
       setFiltered(data);
     } else {
-      const lower = status.toLowerCase();
-      // Ensure we check for the 'Status' key consistently
+      // Filter rows based on the 'Status' key
       setFiltered(data.filter((row) => String(row.Status || "").toLowerCase() === lower));
     }
-  };
-
-  // Helper function to render a value as a styled badge if it is the Status field
-  const renderCellContent = (key, val) => {
-    const valueString = String(val);
-    if (key.toLowerCase() === "status") {
-      const status = valueString.toLowerCase();
-      let className = "status-badge status-default"; // Added status-badge base class
-      if (status === "pending") {
-        className = "status-badge status-pending";
-      } else if (status === "closed") {
-        className = "status-badge status-closed";
-      }
-      return <span className={className}>{valueString}</span>;
-    }
-    return valueString;
   };
 
   const getHeaders = () => {
     if (filtered.length > 0) {
       return Object.keys(filtered[0] || {});
     }
-    // Fallback if data is present but filtered is empty (shouldn't happen with the current logic, but safe)
     if (data.length > 0) {
       return Object.keys(data[0] || {});
     }
     return [];
+  };
+  
+  // Renders the cell content, handling status badges, highlighting, and truncation
+  const renderContent = (key, val, i, j) => {
+    const valueString = String(val);
+    const cellKey = `${i}-${j}`;
+    const isExpanded = expandedCells[cellKey];
+    const isLong = valueString.length > MAX_LENGTH;
+    const isImportantField = key === "Chờ Xác Nhận" || key === "Chờ Đóng";
+
+    const toggleExpand = () => {
+      setExpandedCells(prev => ({
+        ...prev,
+        [cellKey]: !prev[cellKey]
+      }));
+    };
+
+    let content;
+
+    // 1. Status Badge Check
+    if (key.toLowerCase() === "status") {
+      const status = valueString.toLowerCase();
+      let badgeClass = "status-badge status-default";
+      if (status === "pending") {
+        badgeClass = "status-badge status-pending";
+      } else if (status === "closed") {
+        badgeClass = "status-badge status-closed";
+      } else if (status === "new") {
+        badgeClass = "status-badge status-new"; // New Red Status
+      }
+      content = <span className={badgeClass}>{valueString}</span>;
+    } else {
+      // 2. Truncation Logic
+      const displayValue = isExpanded || !isLong
+        ? valueString
+        : valueString.substring(0, MAX_LENGTH);
+      
+      content = <div className="content-text">{displayValue}</div>;
+    }
+
+    // Apply highlighting class if the field is important
+    const cellClass = isImportantField ? "important-field" : "";
+
+    return (
+      <div className={cellClass}>
+        {content}
+        {/* Truncation button logic */}
+        {isLong && (
+          <button onClick={toggleExpand} className="expand-button">
+            {isExpanded ? 'View less' : '...'}
+          </button>
+        )}
+      </div>
+    );
   };
 
   return (
     <div className="dashboard-container">
       <style>
         {`
-          /* Base styles for a modern, clean look */
+          /* ===================================== */
+          /* MOBILE-FIRST BASE STYLES (Performance Focus) */
+          /* ===================================== */
           .dashboard-container {
             min-height: 100vh;
-            background-color: #f7f9fc; /* Light blue-gray background */
-            padding: 2rem;
+            background-color: #f7f9fc;
+            padding: 1rem; 
             font-family: 'Inter', sans-serif;
             color: #333;
+            -webkit-tap-highlight-color: transparent; 
           }
           .main-card {
             max-width: 1200px;
             margin: 0 auto;
             background-color: #ffffff;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-            border-radius: 16px;
-            padding: 2rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); 
+            border-radius: 12px;
+            padding: 1rem;
           }
           .header-title {
-            font-size: 2.25rem; /* 3xl */
+            font-size: 1.5rem;
             font-weight: 700;
-            color: #1e3a8a; /* Deep blue */
-            margin-bottom: 1.5rem;
+            color: #1e3a8a;
+            margin-bottom: 1rem;
             text-align: center;
             border-bottom: 2px solid #e0e7ff;
             padding-bottom: 0.5rem;
           }
+          
+          /* Filter Bar */
           .filter-bar {
             display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column; 
+            align-items: stretch;
             margin-bottom: 1rem;
-            padding: 0.5rem 0;
-            gap: 1rem;
-          }
-          .filter-info {
-            color: #6b7280;
-            font-size: 0.875rem;
+            gap: 0.75rem;
           }
           .filter-controls {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 0.75rem;
-          }
-          .select-label {
-            color: #374151;
-            font-weight: 500;
           }
           .status-select {
             border: 1px solid #d1d5db;
-            border-radius: 8px;
-            padding: 8px 12px;
+            border-radius: 6px;
+            padding: 6px 10px;
             font-size: 0.875rem;
             outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
             background-color: white;
+            min-width: 100px;
           }
-          .status-select:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
-          }
+
+          /* Card View Structure (Applies to all screens for simplicity and speed) */
           .table-wrapper {
-            overflow-x: auto;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
           }
           .data-table {
             width: 100%;
             border-collapse: separate;
-            border-spacing: 0;
+            border-spacing: 0 12px; 
+            margin-top: 12px;
           }
           .table-head {
-            /* General header background (for older browsers/fallbacks) */
-            background-color: #1e3a8a; 
-            color: white;
-          }
-          .table-head th {
-            padding: 12px 16px;
-            text-align: left;
-            font-size: 0.875rem;
-            font-weight: 600;
-            /* CRITICAL FIX: Use !important to override specificity issues */
-            background-color: #1e3a8a !important; 
-            border-bottom: 2px solid #1e3a8a; 
-            color: white !important; /* Ensure text remains white */
-            white-space: nowrap;
+            display: none; /* Header is always hidden for card view */
           }
           .table-body tr {
-            transition: background-color 0.2s;
-          }
-          .table-body tr:nth-child(even) {
-            background-color: #f9fafb; /* Lighter stripe */
+            display: block; 
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: box-shadow 0.2s;
+            background-color: white; /* Ensure consistent white background */
           }
           .table-body tr:hover {
-            background-color: #e0f2fe; /* Lightest blue on hover */
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
           }
           .table-body td {
-            padding: 12px 16px;
-            font-size: 0.875rem;
-            color: #4b5563;
-            border-bottom: 1px solid #e5e7eb;
+            display: flex; 
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 0.5rem 0;
+            font-size: 0.95rem;
+            border-bottom: 1px dashed #e0e7ff; /* Clear separator between fields */
+            word-break: break-word; 
+            white-space: normal;
           }
-          .data-table .table-body tr:last-child td {
-            border-bottom: none;
+          .table-body td:last-of-type {
+            border-bottom: none; 
+          }
+          
+          /* Field Label Styling (The "Chờ Xác Nhận" part) */
+          .table-body td::before {
+            content: attr(data-label);
+            font-weight: 600;
+            color: #1e3a8a;
+            min-width: 40%;
+            flex-shrink: 0;
+            padding-right: 1rem;
+            text-align: left;
           }
 
-          /* Status Badge Styles for readability */
+          /* Status Badge Styles */
           .status-badge {
             padding: 4px 8px;
-            border-radius: 6px;
+            border-radius: 4px;
             font-weight: 600;
             font-size: 0.75rem;
             display: inline-block;
-            text-transform: capitalize;
-            min-width: 60px;
+            text-transform: uppercase;
             text-align: center;
+            margin-left: auto;
+            line-height: 1;
           }
           .status-pending {
-            background-color: #fef3c7; /* Light Yellow */
-            color: #b45309; /* Dark Orange */
+            background-color: #fef3c7; color: #b45309;
           }
           .status-closed {
-            background-color: #d1fae5; /* Light Green */
-            color: #065f46; /* Dark Green */
+            background-color: #d1fae5; color: #065f46;
           }
           .status-default {
-              background-color: #e5e7eb; /* Light Gray */
-              color: #4b5563; /* Dark Gray */
+            background-color: #e5e7eb; color: #4b5563;
+          }
+          .status-new { /* NEW RED STATUS */
+            background-color: #fee2e2; 
+            color: #b91c1c; 
+          }
+          
+          /* Highlight Important Fields (Chờ Xác Nhận / Chờ Đóng) */
+          .important-field {
+            font-weight: bold;
+            color: #1d4ed8; /* Darker blue for values */
+          }
+          /* Apply bold/highlight to the label too when it's an important field */
+          .table-body td[data-label="Chờ Xác Nhận"]::before,
+          .table-body td[data-label="Chờ Đóng"]::before {
+              font-weight: bold;
+              color: #1d4ed8;
+          }
+          .important-field .status-badge {
+             box-shadow: 0 0 5px rgba(29, 78, 216, 0.5); /* Subtle emphasis on the badge */
+          }
+
+          /* Truncation and Expansion Button */
+          .expand-button {
+            background: none;
+            border: none;
+            color: #1d4ed8;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 700; /* Bold for the '...' */
+            margin-top: 0.25rem;
+            padding: 0 4px;
+            text-decoration: none;
+            text-align: right;
+            display: block;
+            width: fit-content;
+            margin-left: auto; /* Push to the right */
+            line-height: 1;
           }
 
           .loading-message, .empty-message {
@@ -212,101 +332,12 @@ export default function App() {
             font-size: 1.125rem;
             color: #6b7280;
           }
-          
-          /* ===================================== */
-          /* MOBILE (CARD VIEW) TRANSFORMATION CSS */
-          /* ===================================== */
-          @media (max-width: 640px) {
-            .main-card {
-                padding: 1rem;
-                border-radius: 8px;
-            }
-            .header-title {
-                font-size: 1.5rem;
-                margin-bottom: 1rem;
-            }
-            .filter-bar {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .filter-info {
-                margin-bottom: 0.5rem;
-            }
-            .filter-controls {
-                justify-content: space-between;
-                width: 100%;
-            }
-
-            /* Card View Styles */
-            .table-wrapper {
-                overflow-x: hidden; /* Prevent horizontal scroll on mobile */
-                border: none;
-                box-shadow: none;
-            }
-            .data-table {
-                /* Add space between rows (cards) */
-                border-spacing: 0 10px;
-                border-collapse: separate;
-            }
-            .table-head {
-                display: none; /* Hide the table header */
-            }
-            .table-body tr {
-                display: block; /* Make row act like a block (card) */
-                margin-bottom: 1rem;
-                border: 1px solid #d1d5db; /* Better border for card separation */
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Lighter shadow */
-                background-color: white !important; /* Ensure consistent background */
-                padding: 1rem;
-                animation: fadeIn 0.3s ease-out;
-            }
-            .table-body tr:nth-child(even), .table-body tr:hover {
-                /* Override striped and hover background on mobile */
-                background-color: white !important;
-            }
-            .table-body td {
-                display: flex; /* Make cell content flex for label/value alignment */
-                justify-content: space-between;
-                align-items: flex-start; /* FIX: Align to top for multi-line content */
-                border-bottom: 1px solid #f3f4f6; /* FIX: Add internal separator for columns/fields */
-                padding: 0.6rem 0;
-                font-size: 1rem; /* Slightly larger text for readability */
-                position: relative;
-                word-break: break-word; /* FIX: Ensure long text wraps */
-                white-space: normal; /* FIX: Ensure normal wrapping behavior */
-            }
-            /* FIX: Remove separator from the last field in the card */
-            .table-body td:last-of-type {
-                border-bottom: none;
-            }
-            
-            .table-body td::before {
-                /* Use the data-label attribute to display the column name */
-                content: attr(data-label);
-                font-weight: 600;
-                color: #1e3a8a; /* Header blue color */
-                min-width: 45%;
-                flex-shrink: 0; /* Prevent label from shrinking */
-                text-align: left;
-                padding-right: 1rem;
-            }
-            .status-badge {
-                /* Ensure badges look good in the flex layout */
-                margin-left: auto;
-            }
-            
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-          }
         `}
       </style>
 
       <div className="main-card">
         <h1 className="header-title">
-          BÁO CÁO SỰ CỐ
+          📊 Data Request Dashboard
         </h1>
 
         {/* Filter bar */}
@@ -322,6 +353,7 @@ export default function App() {
               onChange={(e) => handleFilter(e.target.value)}
             >
               <option value="all">All</option>
+              <option value="new">New</option>
               <option value="pending">Pending</option>
               <option value="closed">Closed</option>
               <option value="other">Other</option>
@@ -329,7 +361,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Table */}
+        {/* Table/Card View */}
         {loading ? (
           <div className="loading-message">Loading data...</div>
         ) : filtered.length === 0 ? (
@@ -350,9 +382,8 @@ export default function App() {
                 {filtered.map((row, i) => (
                   <tr key={i}>
                     {getHeaders().map((key, j) => (
-                      // === MODIFICATION: Added data-label attribute for mobile view ===
                       <td key={j} data-label={key}>
-                        {renderCellContent(key, row[key])}
+                        {renderContent(key, row[key], i, j)}
                       </td>
                     ))}
                   </tr>
