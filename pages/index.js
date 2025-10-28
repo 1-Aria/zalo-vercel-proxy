@@ -412,7 +412,7 @@ export default function App() {
             border-bottom: 1px dashed #e0e7ff; /* Clear separator between fields */
             word-break: break-word; 
             white-space: normal;
-            font-weight: 500;
+            font-weight: 700;
           }
           .table-body td:last-of-type {
             border-bottom: none; 
@@ -422,7 +422,7 @@ export default function App() {
           .table-body td::before {
             content: attr(data-label);
             font-weight: 600;
-            color: #d97706;
+            color: #1e3a8a;
             min-width: 40%;
             flex-shrink: 0;
             padding-right: 1rem;
@@ -464,7 +464,7 @@ export default function App() {
           .table-body td[data-label="Chờ Xác Nhận"]::before,
           .table-body td[data-label="Chờ Đóng"]::before {
               font-weight: bold;
-              color: #d97706;
+              color: #1e3a8a;
           }
           .important-field .status-badge {
              box-shadow: 0 0 5px rgba(29, 78, 216, 0.5); /* Subtle emphasis on the badge */
