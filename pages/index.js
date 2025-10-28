@@ -34,6 +34,44 @@ export default function App() {
   const endpoint =
     'https://script.google.com/macros/s/AKfycbxTUqUYhz9sNpp1SFTdwS4eK4z6_Rb_I49lU17vPdPiNJM1d9AHKvHYO4y8NgHntN97zA/exec';
 
+  /**
+   * Copies the given text to the clipboard and provides visual feedback.
+   * NOTE: Using document.execCommand('copy') for reliability in iframes.
+   */
+  const copyToClipboard = (text) => {
+    // 1. Attempt modern API
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        console.log('Copied successfully:', text);
+      }).catch(err => {
+        console.error('Failed to copy text using modern API, falling back:', err);
+        // Fallback execution
+        performExecCommandCopy(text);
+      });
+    } else {
+      // 2. Fallback using document.execCommand
+      performExecCommandCopy(text);
+    }
+  };
+
+  const performExecCommandCopy = (text) => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    // Make the textarea invisible and append it to the body
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = 0;
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      console.log('Copied to clipboard (fallback):', text);
+    } catch (err) {
+      console.error('Failed to copy text using fallback:', err);
+    }
+    document.body.removeChild(textarea);
+  };
+
+
   // Function to process and set data
   const processData = rawData => {
     // Filter out completely empty rows for clean data presentation
@@ -191,9 +229,41 @@ export default function App() {
     // Apply highlighting class if the field is important
     const cellClass = isImportantField ? 'important-field' : '';
 
+    // NEW: Copy Button for "ID Sự Cố" column
+    const isIdColumn = key === 'ID Sự Cố';
+    const copyButton = isIdColumn ? (
+      <button
+        onClick={() => copyToClipboard(valueString)}
+        className='copy-button'
+        title='Copy ID'
+      >
+        {/* SVG Copy Icon */}
+        <svg
+          xmlns='http://www.w3.org/2000/svg'
+          width='16'
+          height='16'
+          viewBox='0 0 24 24'
+          fill='none'
+          stroke='currentColor'
+          strokeWidth='2.5'
+          strokeLinecap='round'
+          strokeLinejoin='round'
+          className='lucide lucide-copy'
+        >
+          <rect width='14' height='14' x='8' y='8' rx='2' ry='2' />
+          <path d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2' />
+        </svg>
+      </button>
+    ) : null;
+
+    // NEW: Main content wrapper to handle button layout if it's the ID column
     return (
       <div className={cellClass}>
-        {content}
+        <div className={isIdColumn ? 'id-cell-wrapper' : ''}>
+          {content}
+          {copyButton}
+        </div>
+        
         {/* Truncation button logic */}
         {isLong && (
           <button onClick={toggleExpand} className='expand-button'>
@@ -274,7 +344,7 @@ export default function App() {
             margin-top: 0.25rem;
             font-family: monospace;
           }
-          /* --- END INSTRUCTION BOARD STYLES --- */         
+          /* --- END INSTRUCTION BOARD STYLES --- */         
           /* Filter Bar */
           .filter-bar {
             display: flex;
@@ -416,6 +486,38 @@ export default function App() {
             margin-left: auto; /* Push to the right */
             line-height: 1;
           }
+          
+          /* --- NEW: Copy Button Styles --- */
+          .id-cell-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px; /* Space between ID text and button */
+          }
+          
+          .copy-button {
+            background: none;
+            border: 1px solid #d1d5db; /* Light border */
+            border-radius: 4px;
+            color: #1d4ed8;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            flex-shrink: 0; /* Prevents button from shrinking */
+            line-height: 1;
+          }
+          
+          .copy-button:hover {
+            background-color: #eef2ff;
+            border-color: #a5b4fc;
+          }
+          .copy-button:active {
+            background-color: #c7d2fe;
+            transform: translateY(1px);
+          }
+          /* --- END NEW: Copy Button Styles --- */
 
           .loading-message, .empty-message {
             text-align: center;
@@ -428,6 +530,29 @@ export default function App() {
 
       <div className='main-card'>
         <h1 className='header-title'>HỆ THỐNG BẢO TRÌ</h1>
+
+        {/* Filter bar */}
+        <div className='filter-bar'>
+          <p className='filter-info'>
+            Thể hiện <span className='count-highlight'>{filtered.length}</span>{' '}
+            trong <span className='count-highlight'>{data.length}</span> các sự
+            cố
+          </p>
+          <div className='filter-controls'>
+            <label className='select-label'>Lọc theo Status:</label>
+            <select
+              className='status-select'
+              value={statusFilter}
+              onChange={e => handleFilter(e.target.value)}
+            >
+              <option value='all'>All</option>
+              <option value='new'>New</option>
+              <option value='pending'>Pending</option>
+              <option value='closed'>Closed</option>
+              <option value='other'>Other</option>
+            </select>
+          </div>
+        </div>
 
         {/* --- INSTRUCTION BOARD --- */}
         <div className='instruction-box'>
@@ -455,31 +580,6 @@ export default function App() {
           </div>
         </div>
         {/* --- END INSTRUCTION BOARD --- */}
-
-        {/* Table/Card View */}
-
-        {/* Filter bar */}
-        <div className='filter-bar'>
-          <p className='filter-info'>
-            Thể hiện <span className='count-highlight'>{filtered.length}</span>{' '}
-            trong <span className='count-highlight'>{data.length}</span> các sự
-            cố
-          </p>
-          <div className='filter-controls'>
-            <label className='select-label'>Lọc theo Status:</label>
-            <select
-              className='status-select'
-              value={statusFilter}
-              onChange={e => handleFilter(e.target.value)}
-            >
-              <option value='all'>All</option>
-              <option value='new'>New</option>
-              <option value='pending'>Pending</option>
-              <option value='closed'>Closed</option>
-              <option value='other'>Other</option>
-            </select>
-          </div>
-        </div>
 
         {/* Table/Card View */}
         {loading ? (
