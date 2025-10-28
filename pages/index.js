@@ -464,7 +464,7 @@ export default function App() {
           .table-body td[data-label="Chờ Xác Nhận"]::before,
           .table-body td[data-label="Chờ Đóng"]::before {
               font-weight: bold;
-              color: #1e3a8a;
+              color: #d97706;
           }
           .important-field .status-badge {
              box-shadow: 0 0 5px rgba(29, 78, 216, 0.5); /* Subtle emphasis on the badge */
@@ -532,29 +532,6 @@ export default function App() {
       <div className='main-card'>
         <h1 className='header-title'>HỆ THỐNG BẢO TRÌ</h1>
 
-        {/* Filter bar */}
-        <div className='filter-bar'>
-          <p className='filter-info'>
-            Thể hiện <span className='count-highlight'>{filtered.length}</span>{' '}
-            trong <span className='count-highlight'>{data.length}</span> các sự
-            cố
-          </p>
-          <div className='filter-controls'>
-            <label className='select-label'>Lọc theo Status:</label>
-            <select
-              className='status-select'
-              value={statusFilter}
-              onChange={e => handleFilter(e.target.value)}
-            >
-              <option value='all'>All</option>
-              <option value='new'>New</option>
-              <option value='pending'>Pending</option>
-              <option value='closed'>Closed</option>
-              <option value='other'>Other</option>
-            </select>
-          </div>
-        </div>
-
         {/* --- INSTRUCTION BOARD --- */}
         <div className='instruction-box'>
           <h2 className='instruction-title'>Hướng dẫn sử dụng:</h2>
@@ -581,6 +558,29 @@ export default function App() {
           </div>
         </div>
         {/* --- END INSTRUCTION BOARD --- */}
+
+        {/* Filter bar */}
+        <div className='filter-bar'>
+          <p className='filter-info'>
+            Thể hiện <span className='count-highlight'>{filtered.length}</span>{' '}
+            trong <span className='count-highlight'>{data.length}</span> các sự
+            cố
+          </p>
+          <div className='filter-controls'>
+            <label className='select-label'>Lọc theo Status:</label>
+            <select
+              className='status-select'
+              value={statusFilter}
+              onChange={e => handleFilter(e.target.value)}
+            >
+              <option value='all'>All</option>
+              <option value='new'>New</option>
+              <option value='pending'>Pending</option>
+              <option value='closed'>Closed</option>
+              <option value='other'>Other</option>
+            </select>
+          </div>
+        </div>
 
         {/* Table/Card View */}
         {loading ? (
